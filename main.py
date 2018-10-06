@@ -1,8 +1,10 @@
 #!/usr/bin/env python
+from os import path
 import random
 import pygame as pg
 from settings import *
 from sprites import Player, Wall
+from tilemap import Map, Camera
 
 
 class Game(object):
@@ -24,23 +26,36 @@ class Game(object):
         pg.quit()
 
     def load_data(self):
-        pg.mixer.init()  # for sound
+        self.dir = path.dirname(__file__)
+        self.img_dir = self.dir
+        for dir in PLAYER_DIR:
+            self.img_dir = path.join(self.img_dir, dir)
+        self.map = Map(path.join(self.dir, 'map2.txt'))
+        # load imgs:
+        self.player_img = path.join(self.img_dir, PLAYER_IMG)
+        self.player_img = pg.image.load(self.player_img).convert_alpha()
+        # load sound
+        pg.mixer.init()
 
     def new(self):
         # start a new game
         self.all_sprites = pg.sprite.LayeredUpdates()
         # create walls:
         self.walls = pg.sprite.Group()
-        for x in range(10, 20):
-            Wall(self, x, 5)
-        # create player:
-        self.player = Player(self, 0, 0)
+        for row, tiles in enumerate(self.map.data):
+            for col, tile in enumerate(tiles):
+                if tile == '1':
+                    Wall(self, col, row)
+                if tile == 'P':
+                    # create player:
+                    self.player = Player(self, col, row)
+        self.camera = Camera(self.map.width, self.map.height)
 
     def run(self):
         # game loop - set  self.playing = False to end the game
         self.running = True
         while self.running:
-            self.clock.tick(FPS)
+            self.dt = self.clock.tick(FPS) / 1000.
             self.events()
             self.update()
             self.draw()
@@ -70,6 +85,7 @@ class Game(object):
     def update(self):
         # update portion of the game loop
         self.all_sprites.update()
+        self.camera.update(self.player)
 
     def draw_grid(self):
         # vertically:
@@ -82,7 +98,9 @@ class Game(object):
     def draw(self):
         self.screen.fill(BG_COLOR)
         self.draw_grid()
-        self.all_sprites.draw(self.screen)
+        # self.all_sprites.draw(self.screen)
+        for sprite in self.all_sprites:
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
         pg.display.flip()
 
     def quit(self):
