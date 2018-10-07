@@ -3,7 +3,7 @@ from os import path
 import random
 import pygame as pg
 from settings import *
-from sprites import Player, Wall
+from sprites import Player, Mob, Wall
 from tilemap import Map, Camera
 
 
@@ -25,23 +25,37 @@ class Game(object):
 
         pg.quit()
 
+    def load_a_thing(self, thing_file, thing_dir_list=['img'], thing_size=None):
+        thing_dir = self.dir
+        for dir in thing_dir_list:
+            thing_dir = path.join(thing_dir, dir)
+        thing_img = path.join(thing_dir, thing_file)
+        thing_img = pg.image.load(thing_img).convert_alpha()
+        if thing_size:
+            thing_img = pg.transform.scale(thing_img, thing_size)
+        return thing_img
+
     def load_data(self):
         self.dir = path.dirname(__file__)
-        self.img_dir = self.dir
-        for dir in PLAYER_DIR:
-            self.img_dir = path.join(self.img_dir, dir)
-        self.map = Map(path.join(self.dir, 'map2.txt'))
-        # load imgs:
-        self.player_img = path.join(self.img_dir, PLAYER_IMG)
-        self.player_img = pg.image.load(self.player_img).convert_alpha()
+        # Maps:
+        self.map = Map(path.join(self.dir, MAP))
+        # Walls:
+        self.wall_img = self.load_a_thing(WALL_IMG, WALL_DIR, WALL_SIZE)
+        # Player:
+        self.player_img = self.load_a_thing(PLAYER_IMG, PLAYER_DIR)
+        self.bullet_img = self.load_a_thing(BULLET_IMG, BULLET_DIR)
+        # Mobs:
+        self.mob_img = self.load_a_thing(MOB_IMG, MOB_DIR)
+
         # load sound
         pg.mixer.init()
 
     def new(self):
         # start a new game
         self.all_sprites = pg.sprite.LayeredUpdates()
-        # create walls:
         self.walls = pg.sprite.Group()
+        self.bullets = pg.sprite.Group()
+        self.mobs = pg.sprite.Group()
         for row, tiles in enumerate(self.map.data):
             for col, tile in enumerate(tiles):
                 if tile == '1':
@@ -49,6 +63,8 @@ class Game(object):
                 if tile == 'P':
                     # create player:
                     self.player = Player(self, col, row)
+                if tile == 'M':
+                    Mob(self, col, row)
         self.camera = Camera(self.map.width, self.map.height)
 
     def run(self):
@@ -86,6 +102,12 @@ class Game(object):
         # update portion of the game loop
         self.all_sprites.update()
         self.camera.update(self.player)
+        # bullets hit mobs:
+        hits = pg.sprite.groupcollide(self.bullets, self.mobs, True, True)
+        print hits
+        for hit in hits:
+            print hit
+            hit.kill()
 
     def draw_grid(self):
         # vertically:
@@ -96,11 +118,14 @@ class Game(object):
             pg.draw.line(self.screen, LIGHTGREY, (0, y), (WIDTH, y))
 
     def draw(self):
+        pg.display.set_caption('fps: %.5s' % self.clock.get_fps())
         self.screen.fill(BG_COLOR)
-        self.draw_grid()
+        # self.draw_grid()
         # self.all_sprites.draw(self.screen)
         for sprite in self.all_sprites:
             self.screen.blit(sprite.image, self.camera.apply(sprite))
+        # pg.draw.rect(self.screen, WHITE, self.camera.apply(self.player), 2)
+        # pg.draw.rect(self.screen, WHITE, self.camera.apply(rect=self.player.hit_rect), 2)
         pg.display.flip()
 
     def quit(self):
